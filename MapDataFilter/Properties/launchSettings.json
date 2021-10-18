@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MapDataFilter": {
+      "commandName": "Project",
+      "commandLineArgs": "\"F:\\MergedOfflineMap.csv\""
+    }
+  }
+}
