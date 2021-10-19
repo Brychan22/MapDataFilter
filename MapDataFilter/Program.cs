@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace MapDataFilter
 {
@@ -85,7 +86,6 @@ namespace MapDataFilter
             }
 
             Dictionary<Coordinate, List<RoadData>> coordinateRoadMap = new();
-            Dictionary<Coordinate, List<RoadData>> coordinateRoadMapShort = new();
 
             foreach (RoadData roadData in parsedRoadData)
             {
@@ -106,30 +106,109 @@ namespace MapDataFilter
                 {
                     coordinateRoadMap.Add(roadData.EndPoint, new List<RoadData>() { roadData });
                 }
-
-
-                if (coordinateRoadMapShort.ContainsKey(roadData.StartPoint))
-                {
-                    coordinateRoadMapShort[roadData.StartPoint].Add(roadData);
-                }
-                else if (coordinateRoadMapShort.Count < 10)
-                {
-                    coordinateRoadMapShort.Add(roadData.StartPoint, new List<RoadData>() { roadData });
-                }
-
-                if (coordinateRoadMapShort.ContainsKey(roadData.EndPoint))
-                {
-                    coordinateRoadMapShort[roadData.EndPoint].Add(roadData);
-                }
-                else if (coordinateRoadMapShort.Count < 10)
-                {
-                    coordinateRoadMapShort.Add(roadData.EndPoint, new List<RoadData>() { roadData });
-                }
             }
+            // This is contained in a graph; quickly searchable set of nodes
+            HashSet<Node> nodes = new();
+            HashSet<RoadData> expandedRoads = new();
 
+            Node previous = new Node()
+            {
+                NodeName = "Root",
+                AdjacentNodes = new Dictionary<Node, int>()
+            };
+            // Nodes that need expanding
+            Queue<Tuple<RoadData, Node, Coordinate>> queue = new();
 
+            queue.Enqueue(new Tuple<RoadData, Node, Coordinate>(parsedRoadData[1], previous, new Coordinate { Latitude = 0, Longitude = 0 }));
+            while (queue.Count > 0)
+            {
+                if (queue.Count == 100)
+                {
+                    int t = 0;
+                }
+                // Pop an item off the queue
+                Tuple<RoadData, Node, Coordinate> calcData = queue.Dequeue();
+                // Ensure the coord we eval is not the one we just did
+                Coordinate evalCoord = calcData.Item1.StartPoint.Equals(calcData.Item3) ? calcData.Item1.EndPoint : calcData.Item1.StartPoint;
+                List<RoadData> adjoiningRoadData = coordinateRoadMap[evalCoord];
+                // Evaluate its name
+                List<string> roadNames = new();
+                adjoiningRoadData.ForEach(roadData => roadNames.Add(roadData.RoadNames.First()));
+                // Sort alphabetically
+                roadNames.Sort();
+                expandedRoads.Add(calcData.Item1);
+                // Accumulate the name
+                string name = string.Join(",", roadNames);
+                if (name == calcData.Item2.NodeName)
+                {
+                    // Node name already expanded (no exit road), or the road data is broken
+                    nodes.Add(new Node { NodeName = name, AdjacentNodes = new()});
+                    // Find a new node to expand:
+                    int index = 0;
+                    while (index < parsedRoadData.Count && expandedRoads.Contains(parsedRoadData[index++])) ;
+                    if (index < parsedRoadData.Count)
+                    {
+                        queue.Enqueue(new Tuple<RoadData, Node, Coordinate>(parsedRoadData[index], new Node { NodeName = $"Root{index}", AdjacentNodes = new Dictionary<Node, int>() }, new Coordinate { Latitude = 0, Longitude = 0 }));
+                    }
+                    continue;
+                }
+                // Create the node that this item will be represented by
+                Node n = new()
+                {
+                    // Set the name
+                    NodeName = name,
+                    // Init the adjacent nodes list
+                    AdjacentNodes = new()
+                };
+                calcData.Item2.AdjacentNodes.TryAdd(n, 0);
+                // Each connected road must be added to the queue
+                foreach (RoadData item in adjoiningRoadData)
+                {
+                    if (!expandedRoads.Contains(item))
+                    {
+                        // These nodes have not been visited
+                        queue.Enqueue(new Tuple<RoadData, Node, Coordinate>(item, n, evalCoord));
+                    }
+                    // Need the else to link other roads we've been to
+                    
+                }
+                nodes.Add(n);
+            }
+            
 
             int k = 0;
+        }
+
+        /// <summary>
+        /// This will, of course fail as it will overflow the stack
+        /// But the logic is what needs to be implemented
+        /// </summary>
+        /// <param name="source"></param>
+        /// <param name="coordinateRoadMap"></param>
+        /// <param name="nodes"></param>
+        /// <returns></returns>
+        static public Node CalcAllNodes(RoadData source, Dictionary<Coordinate, List<RoadData>> coordinateRoadMap, HashSet<Node> nodes)
+        {
+            List<RoadData> adjoiningRoadData = coordinateRoadMap[source.StartPoint];
+            List<string> roadNames = new();
+            adjoiningRoadData.ForEach(roadData => roadNames.Add(roadData.RoadNames.First()));
+            // Sort alphabetically
+            roadNames.Sort();
+            // Accumulate the name
+            string name = string.Join(",", roadNames);
+            // Beginning node, arbitrary. Begins at the first node for now
+            Node start = new()
+            {
+                NodeName = name,
+                AdjacentNodes = new()
+            };
+            foreach (RoadData item in adjoiningRoadData)
+            {
+                start.AdjacentNodes.Add(CalcAllNodes(item, coordinateRoadMap, nodes), 0);
+            }
+            nodes.Add(start);
+
+            return start;
         }
 
         /// <summary>
@@ -176,9 +255,34 @@ namespace MapDataFilter
 
     struct Node // Aka, intersection
     {
+        /// <summary>
+        /// NodeName is a unique name that represents this intersection.
+        /// The simplest implementation is the name of each connected road, alphabeticised.
+        /// 
+        /// The primary constraint is that it must be consistent, such that the same intersection is always found correctly
+        /// </summary>
         public string NodeName;
 
-        public Dictionary<Node, int> AdjacentNodes; // Intersections that can be directly reached from this Intersection 
+        public Dictionary<Node, int> AdjacentNodes; // Intersections that can be directly reached from this Intersection
+
+
+        /// <summary>
+        /// Hashcode must be consistent, ignoring the memory addresses, and instead focusing on the contained parameters
+        /// </summary>
+        public override int GetHashCode()
+        {
+            return NodeName.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Node other && NodeName.Equals(other.NodeName);
+        }
+
+        public override string ToString()
+        {
+            return NodeName;
+        }
     }
 
     struct RoadGeoMap : IComparable
