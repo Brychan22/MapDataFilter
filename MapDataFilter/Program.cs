@@ -70,7 +70,9 @@ namespace MapDataFilter
             return GeometryID;
         }
     }
-
+    /// <summary>
+    /// Represents a full road segment, captures all the data in the table
+    /// </summary>
     struct RoadData
     {
         List<Coordinate> RoadPath;
@@ -84,6 +86,12 @@ namespace MapDataFilter
         string RoadName;
     }
 
+
+    /// <summary>
+    /// Represents a Latitude-Longitude coordinate pair.
+    /// Implements IEquatable, within an accepted range specified by LatPrecision & LongPrecision,
+    /// such that two positions within an accpetable range are considered identical
+    /// </summary>
     struct Coordinate : IEquatable<Coordinate>
     {
         public double Latitude;
