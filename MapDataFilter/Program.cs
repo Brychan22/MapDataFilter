@@ -9,8 +9,9 @@ namespace MapDataFilter
         static void Main(string[] args)
         {
             Console.ReadLine();
-            List<RoadGeoMap> geoMap = new List<RoadGeoMap>();
-            HashSet<RoadGeoMap> geoHashSet = new HashSet<RoadGeoMap>();
+            //List<RoadGeoMap> geoMap = new List<RoadGeoMap>();
+            //HashSet<RoadGeoMap> geoHashSet = new HashSet<RoadGeoMap>();
+            List<RoadData> rows = new List<RoadData>();
             string delimiter = ",";
             using (StreamReader sr = File.OpenText(args[0]))
             {
@@ -21,25 +22,54 @@ namespace MapDataFilter
                 {
                     try
                     {
+                        string[] parts = line.Split(delimiter);
                         // This loop will go through every line of the file (the file path is passed as a command-line argument `args`
                         // At the moment, it just generates a new sorted list of RoadID: GeometryID, but we can adapt this to better sort our
                         // data
 
                         // TODO: Filter out coordinates from part[0]
 
-                        string[] parts = line.Split(delimiter);
+
                         // We should use TryParse instead, here, as we don't do anything with the exceptional case
-                        int geoID = int.Parse(parts[1]);
-                        int roadID = int.Parse(parts[8]);
-                        List<Coordinate> rowCoord = ParseCoordinates(parts[0]);
+                        // int geoID = int.Parse(parts[1]);
+                        // int roadID = int.Parse(parts[8]);
+
                         // Add a breakpoint, to verify the value of rowCoord
-                        RoadGeoMap roadGeoMap = new RoadGeoMap()
+                        // RoadGeoMap roadGeoMap = new RoadGeoMap()
+                        // {
+                        //    RoadID = roadID,
+                        //    GeometryID = geoID
+                        // };
+                        // geoMap.Add(roadGeoMap);
+                        // geoHashSet.Add(roadGeoMap);
+
+                        List<Coordinate> rowCoord = ParseCoordinates(parts[0]);
+                        int geo_sec_geo_id = int.Parse(parts[1]);
+                        int roadSectionId = int.Parse(parts[2]);
+                        string Suburb = parts[3];
+                        string City = parts[4];
+                        string Region = parts[5];
+                        int AssociationID = int.Parse(parts[6]);
+                        int RoadNameID = int.Parse(parts[7]); // Probably don't need this column
+                        int RoadID = int.Parse(parts[8]);
+                        string RoadName = parts[9];
+
+
+                        RoadData roadData = new RoadData()
                         {
-                            RoadID = roadID,
-                            GeometryID = geoID
+                            RoadPath = rowCoord,
+                            GeomtryID = geo_sec_geo_id,
+                            RoadSectionID = roadSectionId,
+                            Suburb = Suburb,
+                            City = City,
+                            Region = Region,
+                            AssociationID = AssociationID,
+                            RoadNameID = RoadNameID,
+                            RoadID = RoadID,
+                            RoadName = RoadName
                         };
-                        geoMap.Add(roadGeoMap);
-                        geoHashSet.Add(roadGeoMap);
+                        // Add this row to the collection
+                        rows.Add(roadData);
                     }
                     catch
                     {
@@ -48,13 +78,59 @@ namespace MapDataFilter
                     line = sr.ReadLine();
                 }
             }
-            geoMap.Sort();
+            // geoMap.Sort();
 
-            using StreamWriter sw = File.CreateText("Test.txt");
-            foreach (var item in geoMap)
+            // using StreamWriter sw = File.CreateText("Test.txt");
+            // foreach (var item in geoMap)
+            // {
+            //    sw.WriteLine(item);
+            // }
+
+            Dictionary<Coordinate, List<RoadData>> coordinateRoadMap = new();
+            Dictionary<Coordinate, List<RoadData>> coordinateRoadMapShort = new();
+
+            foreach (RoadData roadData in rows)
             {
-                sw.WriteLine(item);
+                if (coordinateRoadMap.ContainsKey(roadData.StartPoint))
+                {
+                    coordinateRoadMap[roadData.StartPoint].Add(roadData);
+                }
+                else
+                {
+                    coordinateRoadMap.Add(roadData.StartPoint, new List<RoadData>() { roadData });
+                }
+
+                if (coordinateRoadMap.ContainsKey(roadData.EndPoint))
+                {
+                    coordinateRoadMap[roadData.EndPoint].Add(roadData);
+                }
+                else
+                {
+                    coordinateRoadMap.Add(roadData.EndPoint, new List<RoadData>() { roadData });
+                }
+
+
+                if (coordinateRoadMapShort.ContainsKey(roadData.StartPoint))
+                {
+                    coordinateRoadMapShort[roadData.StartPoint].Add(roadData);
+                }
+                else if(coordinateRoadMapShort.Count < 10)
+                {
+                    coordinateRoadMapShort.Add(roadData.StartPoint, new List<RoadData>() { roadData });
+                }
+
+                if (coordinateRoadMapShort.ContainsKey(roadData.EndPoint))
+                {
+                    coordinateRoadMapShort[roadData.EndPoint].Add(roadData);
+                }
+                else if (coordinateRoadMapShort.Count < 10)
+                {
+                    coordinateRoadMapShort.Add(roadData.EndPoint, new List<RoadData>() { roadData });
+                }
             }
+
+
+
             int k = 0;
         }
 
@@ -82,8 +158,9 @@ namespace MapDataFilter
             // 174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086
             // We know that each coordinate-pair is delimited by a specific char (I chose the pipe '|' character)
             string[] coordinatePairs = field.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            foreach (string coordinatePair in coordinatePairs)
+            for (int i = 0; i < coordinatePairs.Length; i++)
             {
+                string coordinatePair = coordinatePairs[i];
                 // Each coordinate half is delimited by space, so split by space
                 string[] parts = coordinatePair.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); // "StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries" sets both Flags to true, so they are performed
                                                                                                                                     // If we can parse both numbers, we should set a value
@@ -108,7 +185,12 @@ namespace MapDataFilter
     }
     //hELLO!!!
     
-   
+   struct Node
+    {
+        public string NodeName;
+
+        public Dictionary<Node, int> AdjacentNodes; // Intersections that can be directly reached from this Intersection 
+    }
 
 
     struct RoadGeoMap : IComparable
@@ -137,20 +219,41 @@ namespace MapDataFilter
     /// </summary>
     struct RoadData
     {
-        List<Coordinate> RoadPath;
+        public List<Coordinate> RoadPath;
         // We need two additional fields, at the cost of 16 bytes:
         // These are where the intersections may be
-        Coordinate StartPoint;
-        Coordinate EndPoint;
+        public Coordinate StartPoint
+        {
+            get
+            {
+                if (RoadPath != null && RoadPath.Count > 0)
+                {
+                    return RoadPath[0];
+                }
+                else return new Coordinate();
+            }
+        }
+        public Coordinate EndPoint
+        {
+            get
+            {
+                if (RoadPath != null && RoadPath.Count > 0)
+                {
+                    return RoadPath[^1];
+                }
+                else return new Coordinate();
+            }
+        }
         // Other fields from the source data
-        int RoadSectionID;
-        string Suburb;
-        string City;
-        string Region;
-        int AssociationID;
-        int RoadNameID; // Probably don't need this column
-        int RoadID;
-        string RoadName;
+        public int GeomtryID;
+        public int RoadSectionID;
+        public string Suburb;
+        public string City;
+        public string Region;
+        public int AssociationID;
+        public int RoadNameID; // Probably don't need this column
+        public int RoadID;
+        public string RoadName;
     }
 
 
@@ -164,8 +267,11 @@ namespace MapDataFilter
         public double Latitude;
         public double Longitude;
 
-        public static double LatPrecision = 1e-5; // Approximately 1 m 
-        public static double LongPrecision = 1e-5; // Approximately 0.8 m
+        // NB: 174.442916 is the eastern-most point of the South Island
+        //   & -40.261682 More north than this is North Island
+
+        public static double LatPrecision = 1e-5; // Approximately 10 m 
+        public static double LongPrecision = 1e-5; // Approximately 8 m
 
         /// <summary>
         /// Compare the two coordinates to see if they're equal
@@ -184,7 +290,7 @@ namespace MapDataFilter
 
         public override int GetHashCode()
         {
-            return (Latitude*31 + Longitude*59).GetHashCode();
+            return (Math.Round(Latitude, 4)*31 + Math.Round(Longitude, 4) *59).GetHashCode();
         }
     }
 }
