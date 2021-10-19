@@ -28,9 +28,11 @@ namespace MapDataFilter
                         // TODO: Filter out coordinates from part[0]
 
                         string[] parts = line.Split(delimiter);
+                        // We should use TryParse instead, here, as we don't do anything with the exceptional case
                         int geoID = int.Parse(parts[1]);
                         int roadID = int.Parse(parts[8]);
-
+                        List<Coordinate> rowCoord = ParseCoordinates(parts[0]);
+                        // Add a breakpoint, to verify the value of rowCoord
                         RoadGeoMap roadGeoMap = new RoadGeoMap()
                         {
                             RoadID = roadID,
