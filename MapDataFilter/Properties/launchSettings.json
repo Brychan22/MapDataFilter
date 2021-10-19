@@ -2,7 +2,7 @@
   "profiles": {
     "MapDataFilter": {
       "commandName": "Project",
-      "commandLineArgs": "\"F:\\MergedOfflineMap.csv\""
+      "commandLineArgs": "\"F:\\NZ Roads Subsections.csv\""
     }
   }
 }

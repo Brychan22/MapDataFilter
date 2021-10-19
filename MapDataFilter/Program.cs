@@ -8,51 +8,35 @@ namespace MapDataFilter
     {
         static void Main(string[] args)
         {
+#if DEBUG
+            // Wait for the profiler to attach properly
+            Console.WriteLine($"Reading {args[0]}; Press enter to begin...");
             Console.ReadLine();
-            //List<RoadGeoMap> geoMap = new List<RoadGeoMap>();
-            //HashSet<RoadGeoMap> geoHashSet = new HashSet<RoadGeoMap>();
-            List<RoadData> rows = new List<RoadData>();
+#endif
+            List<RoadData> parsedRoadData = new();
+            // The character which delimits the 
             string delimiter = ",";
+            // StreamReader provides a simple method for reading text from a file
+            // It provides no addtional features (such as file sharing), so should only be used as a quick-and-dirty solution
             using (StreamReader sr = File.OpenText(args[0]))
             {
                 string line = sr.ReadLine();
                 // Skip the first line, as it contains the header
                 line = sr.ReadLine();
+                // This loop will go through every line of the file (the file path is passed as a command-line argument `args`
                 while (!string.IsNullOrEmpty(line))
                 {
                     try
                     {
+                        // Split according to the delimiter char
                         string[] parts = line.Split(delimiter);
-                        // This loop will go through every line of the file (the file path is passed as a command-line argument `args`
-                        // At the moment, it just generates a new sorted list of RoadID: GeometryID, but we can adapt this to better sort our
-                        // data
-
-                        // TODO: Filter out coordinates from part[0]
-
-
-                        // We should use TryParse instead, here, as we don't do anything with the exceptional case
-                        // int geoID = int.Parse(parts[1]);
-                        // int roadID = int.Parse(parts[8]);
-
-                        // Add a breakpoint, to verify the value of rowCoord
-                        // RoadGeoMap roadGeoMap = new RoadGeoMap()
-                        // {
-                        //    RoadID = roadID,
-                        //    GeometryID = geoID
-                        // };
-                        // geoMap.Add(roadGeoMap);
-                        // geoHashSet.Add(roadGeoMap);
-
+                        // First column is coordinate path data; decode
                         List<Coordinate> sectionCoords = ParseCoordinates(parts[0]);
+                        // Get further parameters
                         int geo_sec_geo_id = int.Parse(parts[1]);
                         int roadSectionId = int.Parse(parts[2]);
-                        //string Suburb = parts[3];
-                        //string City = parts[4];
-                        //string Region = parts[5];
-                        // int AssociationID = int.Parse(parts[6]);
-                        // int RoadNameID = int.Parse(parts[7]); // Probably don't need this column
                         int RoadID = int.Parse(parts[5]);
-                        // Specify the list shall hold 3 items
+                        // Parse potentially combined fields
                         List<string> roadNames = new(3) { parts[6] };
                         if (!string.IsNullOrEmpty(parts[7]) || !string.IsNullOrEmpty(parts[8]))
                         {
@@ -62,25 +46,23 @@ namespace MapDataFilter
                                 roadNames.Add(parts[8]);
                             }
                         }
-                        List<string> suburbs = new(2) {  parts[9] };
+                        List<string> suburbs = new(2) { parts[9] };
                         if (!string.IsNullOrEmpty(parts[10]))
                         {
                             suburbs.Add(parts[10]);
                         }
-                        List<string> cities = new(2) {  parts[11] };
+                        List<string> cities = new(2) { parts[11] };
                         if (!string.IsNullOrEmpty(parts[12]))
                         {
                             cities.Add(parts[12]);
                         }
-                        List<string> municipalities = new(2) {  parts[13] };
+                        List<string> municipalities = new(2) { parts[13] };
                         if (!string.IsNullOrEmpty(parts[14]))
                         {
                             municipalities.Add(parts[14]);
                         }
-                        
-
-
-                        RoadData roadData = new RoadData()
+                        // Finally, create the holder and resize
+                        RoadData roadData = new()
                         {
                             RoadPath = sectionCoords,
                             GeomtryID = geo_sec_geo_id,
@@ -92,27 +74,20 @@ namespace MapDataFilter
                             RoadNames = roadNames
                         };
                         // Add this row to the collection
-                        rows.Add(roadData);
+                        parsedRoadData.Add(roadData);
                     }
                     catch
                     {
-                        
+
                     }
                     line = sr.ReadLine();
                 }
             }
-            // geoMap.Sort();
-
-            // using StreamWriter sw = File.CreateText("Test.txt");
-            // foreach (var item in geoMap)
-            // {
-            //    sw.WriteLine(item);
-            // }
 
             Dictionary<Coordinate, List<RoadData>> coordinateRoadMap = new();
             Dictionary<Coordinate, List<RoadData>> coordinateRoadMapShort = new();
 
-            foreach (RoadData roadData in rows)
+            foreach (RoadData roadData in parsedRoadData)
             {
                 if (coordinateRoadMap.ContainsKey(roadData.StartPoint))
                 {
@@ -137,7 +112,7 @@ namespace MapDataFilter
                 {
                     coordinateRoadMapShort[roadData.StartPoint].Add(roadData);
                 }
-                else if(coordinateRoadMapShort.Count < 10)
+                else if (coordinateRoadMapShort.Count < 10)
                 {
                     coordinateRoadMapShort.Add(roadData.StartPoint, new List<RoadData>() { roadData });
                 }
@@ -164,32 +139,22 @@ namespace MapDataFilter
         /// <returns></returns>
         static public List<Coordinate> ParseCoordinates(string field)
         {
-            // Data looks like so
-            // 174.5954606167 -36.0807369167|174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086|
-            // 174.593926779914 -36.0792061121738|174.593473379059 -36.0791982949177|
-            // 174.593090333509 -36.0792217466861|174.592762008751 -36.0791826604055|
-            // 174.592535308324 -36.0789872290022|174.592011552163 -36.0791982949177
-            // (New-lines manually added)
+            // Data is delimted by the pipe character '|'
+            // 174.5954606167 -36.0807369167|174.594731957296 -36.0796673302854
 
             // We need to parse these into the Coordinate class, and build a list
-            List<Coordinate> coordinates = new List<Coordinate>();
-            // Before we break the field into coordinate strings, we should get rid of (trim) the unneccessary characters;
-            // there are a few ways to do this, but the easiest is to simply perform a replace for 'MULTILINESTRING', and then trim space and brackets
-            // field = field.Replace("MULTILINESTRING", "").Trim(new char[] { '(', ')', ' ' });
-            // This results in field being like so:
-            // 174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086
-            // We know that each coordinate-pair is delimited by a specific char (I chose the pipe '|' character)
+            List<Coordinate> coordinates = new();
             string[] coordinatePairs = field.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
             for (int i = 0; i < coordinatePairs.Length; i++)
             {
-                string coordinatePair = coordinatePairs[i];
                 // Each coordinate half is delimited by space, so split by space
-                string[] parts = coordinatePair.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); // "StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries" sets both Flags to true, so they are performed
-                                                                                                                                    // If we can parse both numbers, we should set a value
+                string[] parts = coordinatePairs[i].Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries); // "StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries" sets both Flags to true, so they are performed
+                                                                                                                                        // If we can parse both numbers, we should set a value
                 if (parts.Length == 2 && // Evaluate the length of parts first! Fail-fast, ensures an exception isn't thrown
                     double.TryParse(parts[0], out double longitude) && double.TryParse(parts[1], out double latitude))
                 {
-                    Coordinate coordinate = new Coordinate()
+                    Coordinate coordinate = new()
                     {
                         Latitude = latitude,
                         Longitude = longitude
@@ -198,22 +163,23 @@ namespace MapDataFilter
                 }
                 else
                 {
-                    // Set a breakpoint, as this is a failiure to parse
+                    // Failed to parse coordinate
                     int g = 0;
                 }
             }
+            // Not explicitly needed in such a short-lived program, but a good practice for keeping memory space free
+            // At this point, the list of coordinates is resolved, so we need no further space to be allocated
+            coordinates.TrimExcess();
             return coordinates;
         }
     }
-    //hELLO!!!
-    
-   struct Node
+
+    struct Node // Aka, intersection
     {
         public string NodeName;
 
         public Dictionary<Node, int> AdjacentNodes; // Intersections that can be directly reached from this Intersection 
     }
-
 
     struct RoadGeoMap : IComparable
     {
@@ -274,6 +240,17 @@ namespace MapDataFilter
         public List<string> Regions;
         public int RoadID;
         public List<string> RoadNames; // A road name can be made of 3 parts, Primary (street) name, a secondary name, and the route name
+
+
+        /// <summary>
+        /// Overriding ToString() allows the debugger to display this by logical value, rather than memory allocation
+        /// Helps significantly with debugging
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return $"{RoadNames[0]}, {Suburbs[0]}, {Cities[0]}, {Regions[0]}";
+        }
     }
 
 
@@ -289,9 +266,10 @@ namespace MapDataFilter
 
         // NB: 174.442916 is the eastern-most point of the South Island
         //   & -40.261682 More north than this is North Island
+        // Values less than both are SI-based
 
-        public static double LatPrecision = 1e-5; // Approximately 10 m 
-        public static double LongPrecision = 1e-5; // Approximately 8 m
+        public static double LatPrecision = 1e-4; // Approximately 10 m 
+        public static double LongPrecision = 1e-4; // Approximately 8 m
 
         /// <summary>
         /// Compare the two coordinates to see if they're equal
@@ -310,7 +288,7 @@ namespace MapDataFilter
 
         public override int GetHashCode()
         {
-            return (Math.Round(Latitude, 4)*31 + Math.Round(Longitude, 4) *59).GetHashCode();
+            return (Math.Round(Latitude, 4) * 31 + Math.Round(Longitude, 4) * 59).GetHashCode();
         }
     }
 }
