@@ -15,6 +15,7 @@ namespace MapDataFilter
             using (StreamReader sr = File.OpenText(args[0]))
             {
                 string line = sr.ReadLine();
+                // Skip the first line, as it contains the header
                 line = sr.ReadLine();
                 while (!string.IsNullOrEmpty(line))
                 {
@@ -29,6 +30,7 @@ namespace MapDataFilter
                         string[] parts = line.Split(delimiter);
                         int geoID = int.Parse(parts[1]);
                         int roadID = int.Parse(parts[8]);
+
                         RoadGeoMap roadGeoMap = new RoadGeoMap()
                         {
                             RoadID = roadID,
@@ -59,7 +61,7 @@ namespace MapDataFilter
         /// </summary>
         /// <param name="field"></param>
         /// <returns></returns>
-        public List<Coordinate> ParseCoordinates(string field)
+        static public List<Coordinate> ParseCoordinates(string field)
         {
             // The format of field might look like so:
             // MULTILINESTRING ((174.5954606167 -36.0807369167|
