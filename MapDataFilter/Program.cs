@@ -43,30 +43,53 @@ namespace MapDataFilter
                         // geoMap.Add(roadGeoMap);
                         // geoHashSet.Add(roadGeoMap);
 
-                        List<Coordinate> rowCoord = ParseCoordinates(parts[0]);
+                        List<Coordinate> sectionCoords = ParseCoordinates(parts[0]);
                         int geo_sec_geo_id = int.Parse(parts[1]);
                         int roadSectionId = int.Parse(parts[2]);
-                        string Suburb = parts[3];
-                        string City = parts[4];
-                        string Region = parts[5];
-                        int AssociationID = int.Parse(parts[6]);
-                        int RoadNameID = int.Parse(parts[7]); // Probably don't need this column
-                        int RoadID = int.Parse(parts[8]);
-                        string RoadName = parts[9];
+                        //string Suburb = parts[3];
+                        //string City = parts[4];
+                        //string Region = parts[5];
+                        // int AssociationID = int.Parse(parts[6]);
+                        // int RoadNameID = int.Parse(parts[7]); // Probably don't need this column
+                        int RoadID = int.Parse(parts[5]);
+                        // Specify the list shall hold 3 items
+                        List<string> roadNames = new(3) { parts[6] };
+                        if (!string.IsNullOrEmpty(parts[7]) || !string.IsNullOrEmpty(parts[8]))
+                        {
+                            roadNames.Add(parts[7]);
+                            if (!string.IsNullOrEmpty(parts[8]))
+                            {
+                                roadNames.Add(parts[8]);
+                            }
+                        }
+                        List<string> suburbs = new(2) {  parts[9] };
+                        if (!string.IsNullOrEmpty(parts[10]))
+                        {
+                            suburbs.Add(parts[10]);
+                        }
+                        List<string> cities = new(2) {  parts[11] };
+                        if (!string.IsNullOrEmpty(parts[12]))
+                        {
+                            cities.Add(parts[12]);
+                        }
+                        List<string> municipalities = new(2) {  parts[13] };
+                        if (!string.IsNullOrEmpty(parts[14]))
+                        {
+                            municipalities.Add(parts[14]);
+                        }
+                        
 
 
                         RoadData roadData = new RoadData()
                         {
-                            RoadPath = rowCoord,
+                            RoadPath = sectionCoords,
                             GeomtryID = geo_sec_geo_id,
                             RoadSectionID = roadSectionId,
-                            Suburb = Suburb,
-                            City = City,
-                            Region = Region,
-                            AssociationID = AssociationID,
-                            RoadNameID = RoadNameID,
+                            Suburbs = suburbs,
+                            Cities = cities,
+                            Regions = municipalities,
                             RoadID = RoadID,
-                            RoadName = RoadName
+                            RoadNames = roadNames
                         };
                         // Add this row to the collection
                         rows.Add(roadData);
@@ -141,19 +164,18 @@ namespace MapDataFilter
         /// <returns></returns>
         static public List<Coordinate> ParseCoordinates(string field)
         {
-            // The format of field might look like so:
-            // MULTILINESTRING ((174.5954606167 -36.0807369167|
-            // 174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086|
+            // Data looks like so
+            // 174.5954606167 -36.0807369167|174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086|
             // 174.593926779914 -36.0792061121738|174.593473379059 -36.0791982949177|
             // 174.593090333509 -36.0792217466861|174.592762008751 -36.0791826604055|
-            // 174.592535308324 -36.0789872290022|174.592011552163 -36.0791982949177))
+            // 174.592535308324 -36.0789872290022|174.592011552163 -36.0791982949177
             // (New-lines manually added)
 
             // We need to parse these into the Coordinate class, and build a list
             List<Coordinate> coordinates = new List<Coordinate>();
             // Before we break the field into coordinate strings, we should get rid of (trim) the unneccessary characters;
             // there are a few ways to do this, but the easiest is to simply perform a replace for 'MULTILINESTRING', and then trim space and brackets
-            field = field.Replace("MULTILINESTRING", "").Trim(new char[] { '(', ')', ' ' });
+            // field = field.Replace("MULTILINESTRING", "").Trim(new char[] { '(', ')', ' ' });
             // This results in field being like so:
             // 174.594731957296 -36.0796673302854|174.59441926705 -36.0793780918086
             // We know that each coordinate-pair is delimited by a specific char (I chose the pipe '|' character)
@@ -247,13 +269,11 @@ namespace MapDataFilter
         // Other fields from the source data
         public int GeomtryID;
         public int RoadSectionID;
-        public string Suburb;
-        public string City;
-        public string Region;
-        public int AssociationID;
-        public int RoadNameID; // Probably don't need this column
+        public List<string> Suburbs;
+        public List<string> Cities;
+        public List<string> Regions;
         public int RoadID;
-        public string RoadName;
+        public List<string> RoadNames; // A road name can be made of 3 parts, Primary (street) name, a secondary name, and the route name
     }
 
 
